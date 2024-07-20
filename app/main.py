@@ -9,8 +9,9 @@ def main():
     conn, addr  = server_socket.accept() # wait for client
     print(f"Connection from address: {addr} has been established.")
     response = "HTTP/1.1 200 OK\r\n\r\n"
-    conn.sendall(response.encode('utf-8'))
-    
+    conn.sendall(response)
+    conn.close()
+
 
 
 
