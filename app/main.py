@@ -1,17 +1,11 @@
 import socket
+import threading
 
+response_status_line = "HTTP/1.1 200 OK"
+content_type = "Content-Type: text/plain"
+new_line = "\r\n"
 
-def main():
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
-    
-    server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
-    conn, addr  = server_socket.accept() # wait for client
-    print(f"Connection from address: {addr} has been established.")
-    response_status_line = "HTTP/1.1 200 OK"
-    content_type = "Content-Type: text/plain"
-    new_line = "\r\n"
-
+def parse_request(conn):
     # parse request data
     request_data = conn.recv(1024).decode('utf-8')
     
@@ -39,11 +33,18 @@ def main():
     else:
         response = ("HTTP/1.1 404 Not Found" + 2*new_line).encode()
         
-
-
     conn.sendall(response)
     conn.close()
 
+def main():
+    # You can use print statements as follows for debugging, they'll be visible when running tests.
+    print("Logs from your program will appear here!")
+    
+    server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
+    while True:
+        conn, addr  = server_socket.accept() # wait for client
+        print(f"Connection from address: {addr} has been established.")
+        threading.Thread(target=parse_request, args=(conn,)).start()
 
 
 if __name__ == "__main__":
