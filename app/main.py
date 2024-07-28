@@ -7,7 +7,7 @@ content_type_fmt = "Content-Type: {}"
 content_length_fmt = "Content-Length: {}"
 content_encoding_fmt = "Content-Encoding: {}"
 new_line = "\r\n"
-accepted_compression = ['gzip']
+accepted_compression = {'gzip'}
 
 def response_status_line(res_code=200):
     if res_code == 200:
@@ -19,8 +19,10 @@ def response_status_line(res_code=200):
     else:
         raise ValueError(f"{res_code} isn't handled.")
     
+
 def simple_response(res_code):
     return (response_status_line(res_code)+2*new_line).encode()
+
 
 def compress(body, encoding=None):
     if not encoding:
@@ -28,19 +30,21 @@ def compress(body, encoding=None):
     else:
         return body
 
+
 def full_response(response_body:str, content_type:str="text/plain", res_code: int=200, compression_encoding:str|None=None):
     c_type = content_type_fmt.format(content_type)
     c_len = content_length_fmt.format(len(response_body))
     response_header = new_line.join([c_type, c_len])+new_line
-
-    if compression_encoding and compression_encoding in accepted_compression:
+    compression_encoding_set = set(compression_encoding.split(", ")).intersection(accepted_compression) if compression_encoding else None
+    compression_encoding = compression_encoding_set.pop() if compression_encoding_set else None
+    if compression_encoding:
         c_encode = content_encoding_fmt.format(compression_encoding)
         compressed_body = compress(response_body, compression_encoding)
         c_len = content_length_fmt.format(len(compressed_body))
         response_header = new_line.join([c_type, c_encode, c_len])+new_line
 
     return new_line.join([response_status_line(res_code), response_header, response_body]).encode()
-    
+
 
 def return_file_content(filepath):
     if not os.path.isfile(filepath):
@@ -49,6 +53,7 @@ def return_file_content(filepath):
     with open(filepath, "r") as f:
         data = f.read()
         return full_response(data, content_type="application/octet-stream")
+
 
 def modify_file_content(filepath, data):
     with open(filepath, "x") as f:
@@ -76,20 +81,14 @@ def parse_request(conn):
             continue
         header_key, header_value = header.split(": ") 
         headers[header_key] = header_value
-        
 
     request_body = request_data.split(new_line)[-1]
 
-    
     # parse request_line
     request_type = request_line.split(" ")[0]
     request_url = request_line.split(" ")[1]
-
     # parse request url
     request_action = request_url.split("/")[1]
-
-    # parse request_body
-
 
     print(f"request_type is {request_type}, request_action is {request_action}, request_url is {request_url}")
     if not request_url.startswith("/") :
@@ -117,6 +116,7 @@ def parse_request(conn):
     print("response is ", response)
     conn.sendall(response)
     conn.close()
+
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
