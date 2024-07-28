@@ -12,6 +12,8 @@ def response_status_line(res_code=200):
         return "HTTP/1.1 200 OK"
     elif res_code == 404:
         return "HTTP/1.1 404 Not Found"
+    elif res_code == 201:
+        return "HTTP/1.1 201 Created"
     else:
         raise ValueError(f"{res_code} isn't handled.")
     
@@ -24,13 +26,7 @@ def full_response(response_body, content_type="text/plain", res_code=200):
     response_header = new_line.join([c_type, c_len])+new_line
     return new_line.join([response_status_line(res_code), response_header, response_body]).encode()
 
-def return_file_content(filename):
-    parser = argparse.ArgumentParser("parser")
-    parser.add_argument("--directory", type=str)
-    args = parser.parse_args()
-    dir = args.directory
-    filepath = f"/{dir}/{filename}"
-
+def return_file_content(filepath):
     if not os.path.isfile(filepath):
         return simple_response(404)
     
@@ -38,30 +34,52 @@ def return_file_content(filename):
         data = f.read()
         return full_response(data, content_type="application/octet-stream")
 
+def modify_file_content(filepath, data):
+    with open(filepath, "x") as f:
+        f.write(data)
+        return simple_response(201)
+
+
 def parse_request(conn):
+    # parse arguments
+    parser   = argparse.ArgumentParser("parser")
+    parser.add_argument("--directory", type=str)
+    args = parser.parse_args()
+    dir = args.directory
+
     # parse request data
     request_data = conn.recv(1024).decode('utf-8')
     
     # parse request_line
     request_line = request_data.split(new_line)[0]
+    request_type = request_line.split(" ")[0]
     # parse request url
     request_url = request_line.split(" ")[1]
-    request_type = request_url.split("/")[1]
+    request_action = request_url.split("/")[1]
+
+    # parse request_body
+    request_body = request_data.split(new_line)[-1]
 
 
+    print(f"request_type is {request_type}, request_action is {request_action}, request_url is {request_url}")
     if not request_url.startswith("/") :
         response = simple_response(404)
-    elif request_type == '':
+    elif request_action == '':
         response = simple_response(200)
-    elif request_type == "echo":
+    elif request_action == "echo":
         message_str = request_url.split("/")[-1]
         response = full_response(message_str)
-    elif request_type == "user-agent":
+    elif request_action == "user-agent":
         request_header_agent = request_data.split(new_line)[2].split(": ")[1]
         response = full_response(request_header_agent)
-    elif request_type == "files":
+    elif request_action == "files":
         filename = request_url.split("/")[-1]
-        response = return_file_content(filename)
+        filepath = f"/{dir}/{filename}"
+        if request_type == "GET":
+            response = return_file_content(filepath)
+        elif request_type == "POST":
+            data = request_body
+            response = modify_file_content(filepath, data)
     else:
         response = simple_response(404)
     
@@ -77,6 +95,7 @@ def main():
     while True:
         conn, addr  = server_socket.accept() # wait for client
         print(f"Connection from address: {addr} has been established.")
+ 
         threading.Thread(target=parse_request, args=(conn,)).start()
 
 
