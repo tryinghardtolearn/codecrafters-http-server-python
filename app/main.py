@@ -1,6 +1,7 @@
 import socket
 import threading
 import argparse
+import gzip
 import os
 
 content_type_fmt = "Content-Type: {}"
@@ -25,8 +26,8 @@ def simple_response(res_code):
 
 
 def compress(body, encoding=None):
-    if not encoding:
-        return body
+    if encoding == 'gzip':
+        return gzip.compress(body.encode())
     else:
         return body
 
@@ -39,9 +40,11 @@ def full_response(response_body:str, content_type:str="text/plain", res_code: in
     compression_encoding = compression_encoding_set.pop() if compression_encoding_set else None
     if compression_encoding:
         c_encode = content_encoding_fmt.format(compression_encoding)
-        compressed_body = compress(response_body, compression_encoding)
-        c_len = content_length_fmt.format(len(compressed_body))
-        response_header = new_line.join([c_type, c_encode, c_len])+new_line
+        response_body = compress(response_body, compression_encoding)
+        c_len = content_length_fmt.format(len(response_body))
+        response_header = (new_line.join([c_type, c_encode, c_len])+new_line).encode()
+        return new_line.encode().join([response_status_line(res_code).encode(), response_header, response_body])
+ 
 
     return new_line.join([response_status_line(res_code), response_header, response_body]).encode()
 
