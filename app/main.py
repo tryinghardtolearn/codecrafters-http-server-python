@@ -5,7 +5,9 @@ import os
 
 content_type_fmt = "Content-Type: {}"
 content_length_fmt = "Content-Length: {}"
+content_encoding_fmt = "Content-Encoding: {}"
 new_line = "\r\n"
+accepted_compression = ['gzip']
 
 def response_status_line(res_code=200):
     if res_code == 200:
@@ -20,11 +22,25 @@ def response_status_line(res_code=200):
 def simple_response(res_code):
     return (response_status_line(res_code)+2*new_line).encode()
 
-def full_response(response_body, content_type="text/plain", res_code=200):
+def compress(body, encoding=None):
+    if not encoding:
+        return body
+    else:
+        return body
+
+def full_response(response_body:str, content_type:str="text/plain", res_code: int=200, compression_encoding:str|None=None):
     c_type = content_type_fmt.format(content_type)
     c_len = content_length_fmt.format(len(response_body))
     response_header = new_line.join([c_type, c_len])+new_line
+
+    if compression_encoding and compression_encoding in accepted_compression:
+        c_encode = content_encoding_fmt.format(compression_encoding)
+        compressed_body = compress(response_body, compression_encoding)
+        c_len = content_length_fmt.format(len(compressed_body))
+        response_header = new_line.join([c_type, c_encode, c_len])+new_line
+
     return new_line.join([response_status_line(res_code), response_header, response_body]).encode()
+    
 
 def return_file_content(filepath):
     if not os.path.isfile(filepath):
@@ -49,16 +65,30 @@ def parse_request(conn):
 
     # parse request data
     request_data = conn.recv(1024).decode('utf-8')
+    request_line = request_data.split(new_line)[0]
+    # request_host = request_data.split(new_line)[1]
+
+    # Parse headers
+    headers = {}
+    for header in request_data.split(new_line)[2:-1]:
+        print("Parsing header: ", header)
+        if not header:
+            continue
+        header_key, header_value = header.split(": ") 
+        headers[header_key] = header_value
+        
+
+    request_body = request_data.split(new_line)[-1]
+
     
     # parse request_line
-    request_line = request_data.split(new_line)[0]
     request_type = request_line.split(" ")[0]
-    # parse request url
     request_url = request_line.split(" ")[1]
+
+    # parse request url
     request_action = request_url.split("/")[1]
 
     # parse request_body
-    request_body = request_data.split(new_line)[-1]
 
 
     print(f"request_type is {request_type}, request_action is {request_action}, request_url is {request_url}")
@@ -68,10 +98,11 @@ def parse_request(conn):
         response = simple_response(200)
     elif request_action == "echo":
         message_str = request_url.split("/")[-1]
-        response = full_response(message_str)
+        encoding = headers.setdefault('Accept-Encoding', None)
+        response = full_response(message_str,compression_encoding=encoding)
     elif request_action == "user-agent":
-        request_header_agent = request_data.split(new_line)[2].split(": ")[1]
-        response = full_response(request_header_agent)
+        user_agent=headers.setdefault('User-Agent', '')
+        response = full_response(user_agent)
     elif request_action == "files":
         filename = request_url.split("/")[-1]
         filepath = f"/{dir}/{filename}"
